@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "telebot-mtproto"
+version = "1.0.0"
+authors = [
+    { name = "Telebot MTProto Developer", email = "developer@tenmiencuaban.com" }
+]
+description = "A lightweight wrapper that brings pyTelegramBotAPI (Telebot) syntax to the powerful MTProto protocol using Telethon under the hood"
+readme = "README.md"
+requires-python = ">=3.7"
+keywords = ["telegram", "bot", "userbot", "mtproto", "telebot", "pytelegrambotapi", "telethon"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Communications :: Chat",
+]
+dependencies = [
+    "Telethon>=1.24.0"
+]
+
+[tool.setuptools.packages.find]
+include = ["telebot_mtproto*"]
