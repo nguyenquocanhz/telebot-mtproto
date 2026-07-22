@@ -1,39 +1,57 @@
-# Telebot MTProto for Python
+# Telebot MTProto 🚀
 
-A lightweight wrapper that brings the simple and familiar decorator-based syntax of `pyTelegramBotAPI` (Telebot) to the high-performance **MTProto** protocol (using Telethon under the hood).
+[![PyPI version](https://img.shields.io/pypi/v/telebot-mtproto.svg)](https://pypi.org/project/telebot-mtproto/)
+[![Python Version](https://img.shields.io/pypi/pyversions/telebot-mtproto.svg)](https://pypi.org/project/telebot-mtproto/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Why Telebot MTProto?
+A lightweight, powerful Python wrapper that brings the simple and familiar decorator-based syntax of **`pyTelegramBotAPI` (`telebot`)** to the high-performance **MTProto** protocol (powered by **Telethon** under the hood).
 
-When building Telegram bots with `pyTelegramBotAPI` (`telebot`), you are limited by the HTTP-based Bot API:
-- Cannot download files larger than **20MB**.
-- Cannot upload files larger than **50MB**.
-- HTTP overhead slows down responses.
+---
 
-**Telebot MTProto** solves this! By running directly over MTProto (TCP):
-- **Send & Download files up to 2GB** (or 4GB with Telegram Premium).
-- **Run as a Bot** (using bot token) or as a **Userbot** (using phone login session).
-- Enjoy direct TCP speed with zero-change friendly Telebot syntax.
+## ⚡ Why Telebot MTProto?
 
-## Installation
+When building Telegram bots with standard HTTP-based Bot API libraries (`pyTelegramBotAPI` / `telebot`), you hit severe Telegram HTTP server limits:
+- ❌ Cannot download files larger than **20MB**.
+- ❌ Cannot upload files larger than **50MB**.
+- ❌ HTTP REST polling/webhooks introduce unnecessary request overhead.
 
-Install using pip:
+**Telebot MTProto solves all of these limitations!** By running directly over Telegram's binary **MTProto protocol (TCP)**:
+- ✅ **Send & Download Large Files**: Up to **2GB** (or **4GB** with Telegram Premium).
+- ✅ **Real-time Progress Callbacks**: Track exact upload/download percentage.
+- ✅ **Dual Account Mode**: Run as a **Bot** (using Bot Token) or as a **Userbot** (using phone login session).
+- ✅ **Full Keyboard Support**: Build `InlineKeyboardMarkup` and `ReplyKeyboardMarkup` effortlessly.
+- ✅ **Direct Proxy Integration**: Built-in support for SOCKS5, HTTP, and MTProto Proxies.
+- ✅ **Zero Learning Curve**: Use your existing `pyTelegramBotAPI` knowledge and syntax!
 
+---
+
+## 📦 Installation
+
+### Option 1: Via PyPI (Recommended)
 ```bash
 pip install telebot-mtproto
 ```
 
-## Quick Start
+### Option 2: Directly from GitHub
+```bash
+pip install git+https://github.com/nguyenquocanhz/telebot-mtproto.git
+```
 
-### 1. Run as a Bot Account (with Token)
+---
+
+## 🚀 Quick Start Examples
+
+### 1. Basic Bot (with Bot Token)
+
+Get your `api_id` and `api_hash` from [https://my.telegram.org](https://my.telegram.org):
 
 ```python
 from telebot_mtproto import MTProtoTeleBot
 
-# Get api_id and api_hash from https://my.telegram.org
 bot = MTProtoTeleBot(
-    api_id=123456,
-    api_hash="your_api_hash",
-    bot_token="your_bot_token_from_botfather"
+    api_id=1234567,
+    api_hash="YOUR_API_HASH",
+    bot_token="YOUR_BOT_TOKEN"
 )
 
 @bot.message_handler(commands=['start', 'help'])
@@ -44,45 +62,149 @@ def send_welcome(message):
 def echo_all(message):
     bot.reply_to(message, f"You said: {message.text}")
 
-# Start the bot
+# Start polling
 bot.run()
 ```
 
-### 2. Run as a Userbot Account (with Phone Login)
+---
 
-If you don't provide a `bot_token`, it will act as a Userbot. During the first run, it will prompt you in the terminal to enter your phone number and the OTP code sent by Telegram.
+### 2. Interactive Inline Keyboards & Callback Queries
+
+```python
+from telebot_mtproto import MTProtoTeleBot
+from telebot_mtproto.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+bot = MTProtoTeleBot(api_id=1234567, api_hash="YOUR_API_HASH", bot_token="YOUR_BOT_TOKEN")
+
+@bot.message_handler(commands=['menu'])
+def show_menu(message):
+    markup = InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        InlineKeyboardButton("GitHub Repo", url="https://github.com/nguyenquocanhz/telebot-mtproto"),
+        InlineKeyboardButton("Click Me", callback_data="btn_click")
+    )
+    bot.send_message(message.chat.id, "Please select an option:", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_listener(call):
+    if call.data == "btn_click":
+        bot.answer_callback_query(call.id, text="You clicked the button!", show_alert=True)
+
+bot.run()
+```
+
+---
+
+### 3. Send & Download Large Files (> 20MB / 50MB) with Progress Bar
+
+```python
+from telebot_mtproto import MTProtoTeleBot
+
+bot = MTProtoTeleBot(api_id=1234567, api_hash="YOUR_API_HASH", bot_token="YOUR_BOT_TOKEN")
+
+def progress(current, total):
+    print(f"Transferred: {current}/{total} bytes ({current/total*100:.1f}%)")
+
+# Upload up to 2GB / 4GB file
+@bot.message_handler(commands=['send_big'])
+def send_large_file(message):
+    bot.reply_to(message, "Uploading large video file...")
+    bot.send_video(message.chat.id, "./media/huge_video.mp4", progress_callback=progress)
+
+# Download large file directly via MTProto
+@bot.message_handler(content_types=['document', 'video', 'photo'])
+def download_large_file(message):
+    bot.reply_to(message, "Downloading media file...")
+    dest = f"./downloads/{message.message_id}.file"
+    bot.download_file(message, dest, progress_callback=progress)
+    bot.reply_to(message, f"File saved to {dest}")
+
+bot.run()
+```
+
+---
+
+### 4. Userbot Mode (Phone Login)
+
+If you omit `bot_token`, it will run as a **Userbot** acting on behalf of a personal Telegram account:
 
 ```python
 from telebot_mtproto import MTProtoTeleBot
 
 bot = MTProtoTeleBot(
-    api_id=123456,
-    api_hash="your_api_hash",
+    api_id=1234567,
+    api_hash="YOUR_API_HASH",
     session_name="my_userbot_session"
 )
 
 @bot.message_handler(commands=['ping'])
 def ping(message):
-    bot.reply_to(message, "Pong from userbot!")
+    bot.reply_to(message, "Pong from Userbot!")
 
 bot.run()
 ```
 
-### 3. Send and Download Large Files (> 20MB)
+---
+
+### 5. Proxy Support (SOCKS5 / HTTP / MTProto)
 
 ```python
-@bot.message_handler(commands=['download'])
-def get_large_file(message):
-    if message.reply_to_message:
-        bot.reply_to(message, "Downloading large file... (up to 2GB supported)")
-        
-        # Download file directly over MTProto TCP
-        dest = "./downloads/large_file.zip"
-        bot.download_file(message.reply_to_message, dest)
-        
-        bot.reply_to(message, f"File saved to {dest}")
+from telebot_mtproto import MTProtoTeleBot
+
+bot = MTProtoTeleBot(
+    api_id=1234567,
+    api_hash="YOUR_API_HASH",
+    bot_token="YOUR_BOT_TOKEN",
+    proxy=("socks5", "127.0.0.1", 1080)
+)
 ```
 
-## License
+---
 
-MIT License.
+## 🛠️ Supported Content Types
+
+Filter messages effortlessly using `content_types`:
+- `'text'`
+- `'photo'`
+- `'video'`
+- `'document'`
+- `'audio'`
+- `'voice'`
+- `'sticker'`
+- `'location'`
+- `'contact'`
+
+```python
+@bot.message_handler(content_types=['photo', 'video'])
+def handle_media_messages(message):
+    print(f"Received media of type: {message.content_type}")
+```
+
+---
+
+## 📋 API Reference
+
+| Method / Decorator | Description |
+| :--- | :--- |
+| `@bot.message_handler(...)` | Filter and handle incoming messages (`content_types`, `commands`, `regexp`, `func`) |
+| `@bot.callback_query_handler(...)` | Handle inline keyboard button clicks |
+| `bot.send_message(chat_id, text, ...)` | Send text messages |
+| `bot.reply_to(message, text, ...)` | Reply directly to a message |
+| `bot.send_document(chat_id, file_path, ...)` | Send documents up to 2GB/4GB |
+| `bot.send_photo(chat_id, file_path, ...)` | Send photo files |
+| `bot.send_video(chat_id, file_path, ...)` | Send video files |
+| `bot.send_audio(chat_id, file_path, ...)` | Send audio files |
+| `bot.send_voice(chat_id, file_path, ...)` | Send voice messages |
+| `bot.send_sticker(chat_id, file_path)` | Send stickers |
+| `bot.send_location(chat_id, lat, lon)` | Send geographic location |
+| `bot.download_file(message, dest_path, ...)` | Download attached media |
+| `bot.answer_callback_query(call_id, ...)` | Respond to inline button clicks |
+| `bot.edit_message_text(chat_id, msg_id, text)` | Edit an existing message |
+| `bot.delete_message(chat_id, msg_id)` | Delete a message |
+| `bot.forward_message(chat_id, from_chat_id, msg_id)` | Forward a message |
+
+---
+
+## 📄 License
+
+Distributed under the MIT License. See [LICENSE](file:///d:/SellBot/LICENSE) for details.
