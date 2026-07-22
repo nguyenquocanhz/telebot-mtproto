@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  # 1. HomeNAS Web Application (Giao diện Web Quản lý File Glassmorphism)
+  homenas:
+    build: .
+    container_name: homenas_web
+    restart: always
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/storage
+    environment:
+      - STORAGE_DIR=/storage
+
+  # 2. Samba (SMB Server - Chia sẻ Ổ đĩa trực tiếp cho Windows Explorer & Mac Finder)
+  samba:
+    image: dperson/samba:latest
+    container_name: homenas_samba
+    restart: always
+    ports:
+      - "139:139"
+      - "445:445"
+    volumes:
+      - ./data:/mount/storage
+    command: -s "HomeNAS-Storage;/mount/storage;yes;no;no;all;none;admin" -u "admin;naspassword123"
+
+  # 3. FileBrowser (Tùy chọn: Công cụ quản lý File chuẩn Open-Source)
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    container_name: homenas_filebrowser
+    restart: always
+    ports:
+      - "8081:80"
+    volumes:
+      - ./data:/srv
+      - ./filebrowser.db:/database/filebrowser.db
+      - ./filebrowser.json:/.filebrowser.json

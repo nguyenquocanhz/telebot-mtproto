@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HomeNAS Server - Quản lý File Lưu Trữ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+      --glass-bg: rgba(30, 41, 59, 0.7);
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --accent-glow: rgba(99, 102, 241, 0.35);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --card-bg: rgba(15, 23, 42, 0.6);
+      --danger: #ef4444;
+      --success: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    header {
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--glass-border);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo-area {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo-icon {
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      color: white;
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+
+    .logo-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    /* Main Container */
+    .container {
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1.5rem;
+      flex: 1;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Sidebar / Dashboard Stats */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .glass-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 1.25rem;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    }
+
+    .card-header {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .progress-bar-bg {
+      background: rgba(255, 255, 255, 0.1);
+      height: 10px;
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 0.5rem 0;
+    }
+
+    .progress-bar-fill {
+      background: linear-gradient(90deg, #6366f1, #a855f7);
+      height: 100%;
+      border-radius: 10px;
+      transition: width 0.5s ease;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+
+    /* Action Buttons */
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.25rem;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+      font-size: 0.9rem;
+    }
+
+    .btn:hover {
+      background: var(--accent-hover);
+      box-shadow: 0 0 15px var(--accent-glow);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      border: 1px solid var(--glass-border);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+      box-shadow: none;
+    }
+
+    /* File Explorer Content Area */
+    .content-area {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* Breadcrumbs */
+    .breadcrumb-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--glass-bg);
+      padding: 0.75rem 1.25rem;
+      border-radius: 12px;
+      border: 1px solid var(--glass-border);
+      font-size: 0.9rem;
+    }
+
+    .breadcrumb-item {
+      color: var(--accent);
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .breadcrumb-item:hover {
+      text-decoration: underline;
+    }
+
+    /* File Table / Grid */
+    .file-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .file-table th {
+      text-align: left;
+      padding: 0.85rem 1rem;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--glass-border);
+      font-weight: 600;
+    }
+
+    .file-table td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      vertical-align: middle;
+    }
+
+    .file-row {
+      transition: background 0.15s ease;
+      cursor: pointer;
+    }
+
+    .file-row:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .file-name-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 500;
+    }
+
+    .file-icon {
+      font-size: 1.2rem;
+      width: 24px;
+      text-align: center;
+    }
+
+    .file-icon.folder { color: #f59e0b; }
+    .file-icon.image { color: #ec4899; }
+    .file-icon.video { color: #8b5cf6; }
+    .file-icon.audio { color: #10b981; }
+    .file-icon.document { color: #3b82f6; }
+    .file-icon.archive { color: #f97316; }
+    .file-icon.file { color: #94a3b8; }
+
+    .action-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0.4rem;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .action-btn.delete:hover {
+      color: var(--danger);
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-box {
+      background: #1e293b;
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      width: 90%;
+      max-width: 500px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-header {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-body input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      color: white;
+      font-size: 0.95rem;
+      margin-bottom: 1.25rem;
+      outline: none;
+    }
+
+    .modal-body input:focus {
+      border-color: var(--accent);
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+
+    /* Select option dark mode rule requirement */
+    select.form-control option {
+      background-color: #1e293b;
+      color: #f8fafc;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="logo-area">
+      <div class="logo-icon"><i class="fa-solid fa-server"></i></div>
+      <div>
+        <div class="logo-title">HomeNAS Server</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">Personal Cloud Storage</div>
+      </div>
+    </div>
+    <div style="display: flex; gap: 1rem; align-items: center;">
+      <span style="font-size: 0.85rem; color: var(--text-muted);"><i class="fa-solid fa-signal" style="color: var(--success);"></i> Online</span>
+    </div>
+  </header>
+
+  <!-- Main Layout -->
+  <div class="container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="glass-card">
+        <div class="card-header">
+          <span>Dung lượng Ổ đĩa</span>
+          <i class="fa-solid fa-hard-drive"></i>
+        </div>
+        <div class="progress-bar-bg">
+          <div id="diskProgress" class="progress-bar-fill" style="width: 0%;"></div>
+        </div>
+        <div class="stat-row">
+          <span>Đã dùng: <strong id="diskUsed">-</strong></span>
+          <span>Trống: <strong id="diskFree">-</strong></span>
+        </div>
+        <div class="stat-row" style="margin-top: 0.25rem;">
+          <span>Tổng số: <strong id="diskTotal">-</strong></span>
+          <span><strong id="diskPercent">0%</strong></span>
+        </div>
+      </div>
+
+      <div class="glass-card">
+        <div class="card-header">
+          <span>Hệ thống Server</span>
+          <i class="fa-solid fa-microchip"></i>
+        </div>
+        <div class="stat-row">
+          <span>CPU:</span>
+          <strong id="cpuPercent">0%</strong>
+        </div>
+        <div class="stat-row">
+          <span>RAM:</span>
+          <strong id="ramPercent">0%</strong>
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn" onclick="triggerUpload()"><i class="fa-solid fa-cloud-arrow-up"></i> Tải file lên</button>
+        <button class="btn btn-secondary" onclick="openMkdirModal()"><i class="fa-solid fa-folder-plus"></i> Tạo thư mục mới</button>
+        <input type="file" id="fileInput" style="display: none;" onchange="handleFileSelect(event)">
+      </div>
+    </aside>
+
+    <!-- Content Area -->
+    <main class="content-area">
+      <!-- Breadcrumb -->
+      <div class="breadcrumb-bar" id="breadcrumbBar">
+        <span class="breadcrumb-item" onclick="navigateTo('')"><i class="fa-solid fa-house"></i> Home</span>
+      </div>
+
+      <!-- File Table Card -->
+      <div class="glass-card" style="padding: 0; overflow: hidden;">
+        <table class="file-table">
+          <thead>
+            <tr>
+              <th>Tên File / Thư mục</th>
+              <th style="width: 140px;">Kích thước</th>
+              <th style="width: 180px;">Ngày sửa</th>
+              <th style="width: 100px; text-align: right;">Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="fileList">
+            <tr>
+              <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 2rem;">Đang tải danh sách...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <!-- Mkdir Modal -->
+  <div class="modal-overlay" id="mkdirModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span>Tạo thư mục mới</span>
+        <i class="fa-solid fa-xmark" style="cursor: pointer;" onclick="closeMkdirModal()"></i>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="folderNameInput" placeholder="Nhập tên thư mục...">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeMkdirModal()">Hủy</button>
+        <button class="btn" onclick="submitMkdir()">Tạo ngay</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentPath = "";
+
+    async function loadSystemStats() {
+      try {
+        const res = await fetch('/api/system');
+        const data = await res.json();
+        document.getElementById('diskUsed').innerText = data.disk.used;
+        document.getElementById('diskFree').innerText = data.disk.free;
+        document.getElementById('diskTotal').innerText = data.disk.total;
+        document.getElementById('diskPercent').innerText = data.disk.percent + '%';
+        document.getElementById('diskProgress').style.width = data.disk.percent + '%';
+        document.getElementById('cpuPercent').innerText = data.cpu.percent + '%';
+        document.getElementById('ramPercent').innerText = data.memory.percent + '%';
+      } catch (e) {
+        console.error("Error loading system stats", e);
+      }
+    }
+
+    async function loadFiles(path = "") {
+      currentPath = path;
+      updateBreadcrumb(path);
+      try {
+        const res = await fetch(`/api/files?path=${encodeURIComponent(path)}`);
+        if (!res.ok) throw new Error("Directory error");
+        const data = await res.json();
+
+        const tbody = document.getElementById('fileList');
+        tbody.innerHTML = "";
+
+        if (data.items.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 2rem;">Thư mục trống</td></tr>`;
+          return;
+        }
+
+        data.items.forEach(item => {
+          const tr = document.createElement('tr');
+          tr.className = 'file-row';
+
+          let iconClass = 'fa-file file';
+          if (item.icon === 'folder') iconClass = 'fa-folder folder';
+          else if (item.icon === 'image') iconClass = 'fa-file-image image';
+          else if (item.icon === 'video') iconClass = 'fa-file-video video';
+          else if (item.icon === 'audio') iconClass = 'fa-file-audio audio';
+          else if (item.icon === 'archive') iconClass = 'fa-file-zipper archive';
+          else if (item.icon === 'document') iconClass = 'fa-file-lines document';
+
+          tr.innerHTML = `
+            <td>
+              <div class="file-name-cell" onclick="${item.is_dir ? `navigateTo('${item.path}')` : `downloadFile('${item.path}')`}">
+                <i class="fa-solid ${iconClass} file-icon ${item.icon}"></i>
+                <span>${item.name}</span>
+              </div>
+            </td>
+            <td>${item.size}</td>
+            <td>${item.modified}</td>
+            <td style="text-align: right;">
+              ${!item.is_dir ? `<button class="action-btn" onclick="downloadFile('${item.path}')" title="Tải về"><i class="fa-solid fa-download"></i></button>` : ''}
+              <button class="action-btn delete" onclick="deleteItem('${item.path}')" title="Xóa"><i class="fa-solid fa-trash"></i></button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function updateBreadcrumb(path) {
+      const bar = document.getElementById('breadcrumbBar');
+      bar.innerHTML = `<span class="breadcrumb-item" onclick="navigateTo('')"><i class="fa-solid fa-house"></i> Home</span>`;
+      
+      if (!path) return;
+      const parts = path.split('/');
+      let accumulated = "";
+      parts.forEach((p, idx) => {
+        if (!p) return;
+        accumulated += (accumulated ? '/' : '') + p;
+        const currentAccumulated = accumulated;
+        bar.innerHTML += ` <span style="color: var(--text-muted);">/</span> <span class="breadcrumb-item" onclick="navigateTo('${currentAccumulated}')">${p}</span>`;
+      });
+    }
+
+    function navigateTo(path) {
+      loadFiles(path);
+    }
+
+    function triggerUpload() {
+      document.getElementById('fileInput').click();
+    }
+
+    async function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('path', currentPath);
+
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        });
+        if (res.ok) {
+          loadFiles(currentPath);
+          loadSystemStats();
+        } else {
+          alert('Upload thất bại!');
+        }
+      } catch (e) {
+        alert('Lỗi khi tải file!');
+      }
+      event.target.value = '';
+    }
+
+    function downloadFile(path) {
+      window.location.href = `/api/download?path=${encodeURIComponent(path)}`;
+    }
+
+    async function deleteItem(path) {
+      if (!confirm(`Bạn có chắc muốn xóa item này không?`)) return;
+      try {
+        const res = await fetch(`/api/delete?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
+        if (res.ok) {
+          loadFiles(currentPath);
+          loadSystemStats();
+        }
+      } catch (e) {
+        alert('Không thể xóa item!');
+      }
+    }
+
+    function openMkdirModal() {
+      document.getElementById('mkdirModal').classList.add('active');
+    }
+
+    function closeMkdirModal() {
+      document.getElementById('mkdirModal').classList.remove('active');
+      document.getElementById('folderNameInput').value = '';
+    }
+
+    async function submitMkdir() {
+      const name = document.getElementById('folderNameInput').value.trim();
+      if (!name) return;
+
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('path', currentPath);
+
+      try {
+        const res = await fetch('/api/mkdir', { method: 'POST', body: formData });
+        if (res.ok) {
+          closeMkdirModal();
+          loadFiles(currentPath);
+        } else {
+          alert('Tạo thư mục thất bại!');
+        }
+      } catch (e) {
+        alert('Lỗi tạo thư mục!');
+      }
+    }
+
+    // Initialize
+    loadSystemStats();
+    loadFiles("");
+    setInterval(loadSystemStats, 10000);
+  </script>
+</body>
+</html>
