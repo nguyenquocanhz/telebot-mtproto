@@ -10,3 +10,5 @@ dist/
 *.egg-info/
 *.session
 *.session-journal
+sellerbot_db.json
+.pytest_cache/

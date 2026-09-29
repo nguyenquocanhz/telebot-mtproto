@@ -4,6 +4,7 @@
 # nhưng chạy trực tiếp trên giao thức MTProto (TCP) tốc độ cao và không giới hạn kích thước file gửi/nhận (hỗ trợ tới 2GB).
 
 import asyncio
+import inspect
 import re
 from typing import List, Callable, Any, Optional, Union
 from telethon import TelegramClient, events
@@ -23,27 +24,28 @@ class ChatAdapter:
 
 class UserAdapter:
     """Giả lập đối tượng User của pyTelegramBotAPI"""
-    def __init__(self, user: Optional[TelethonUser]):
+    def __init__(self, user: Optional[TelethonUser], fallback_id: Optional[int] = None):
         if user:
-            self.id = getattr(user, 'id', None)
-            self.first_name = getattr(user, 'first_name', '')
-            self.last_name = getattr(user, 'last_name', '')
-            self.username = getattr(user, 'username', '')
+            self.id = getattr(user, 'id', fallback_id)
+            self.first_name = getattr(user, 'first_name', '') or ''
+            self.last_name = getattr(user, 'last_name', '') or ''
+            self.username = getattr(user, 'username', '') or ''
         else:
-            self.id = None
+            self.id = fallback_id
             self.first_name = ''
             self.last_name = ''
             self.username = ''
 
 class MessageAdapter:
     """Giả lập đối tượng Message của pyTelegramBotAPI từ đối tượng Event/Message của Telethon"""
-    def __init__(self, event_message: TelethonMessage, sender: Optional[TelethonUser] = None):
+    def __init__(self, event_message: Any, sender: Optional[TelethonUser] = None):
         self.raw = event_message
-        self.message_id = event_message.id
-        self.text = event_message.message or ""
-        self.caption = event_message.message or ""
-        self.chat = ChatAdapter(event_message.chat_id)
-        self.from_user = UserAdapter(sender)
+        self.message_id = getattr(event_message, 'id', None)
+        self.text = getattr(event_message, 'message', "") or ""
+        self.caption = getattr(event_message, 'message', "") or ""
+        chat_id = getattr(event_message, 'chat_id', None)
+        self.chat = ChatAdapter(chat_id if chat_id is not None else 0)
+        self.from_user = UserAdapter(sender, fallback_id=getattr(event_message, 'sender_id', None))
 
         # Xác định content_type và media đính kèm
         self.content_type = "text"
@@ -56,7 +58,7 @@ class MessageAdapter:
         self.location = None
         self.contact = None
 
-        if event_message.media:
+        if getattr(event_message, 'media', None):
             if isinstance(event_message.media, MessageMediaPhoto):
                 self.content_type = "photo"
                 self.photo = event_message.media
@@ -89,17 +91,80 @@ class MessageAdapter:
         # Xử lý tin nhắn reply
         self.reply_to_message = None
         self.reply_to_message_id = None
-        if event_message.is_reply and getattr(event_message, 'reply_to', None):
+        if getattr(event_message, 'is_reply', False) and getattr(event_message, 'reply_to', None):
             self.reply_to_message_id = getattr(event_message.reply_to, 'reply_to_msg_id', None)
 
 class CallbackQueryAdapter:
     """Giả lập đối tượng CallbackQuery của pyTelegramBotAPI cho nút bấm Inline"""
-    def __init__(self, event):
+    def __init__(self, event, sender: Optional[TelethonUser] = None, message: Optional[Any] = None):
         self.raw = event
-        self.id = str(event.query.id) if getattr(event, 'query', None) else ""
-        self.data = event.data.decode('utf-8') if isinstance(event.data, bytes) else (event.data or "")
-        self.from_user = UserAdapter(getattr(event, 'sender', None))
-        self.message = MessageAdapter(event.message) if getattr(event, 'message', None) else None
+
+        # 1. Trích xuất callback query id an toàn
+        query_id = None
+        if hasattr(event, 'id'):
+            try:
+                query_id = event.id
+            except Exception:
+                query_id = None
+
+        if query_id is None and getattr(event, 'query', None) is not None:
+            query_id = getattr(event.query, 'query_id', None) or getattr(event.query, 'id', None)
+
+        if query_id is None:
+            query_id = getattr(event, 'query_id', "")
+
+        self.id = str(query_id) if query_id is not None else ""
+
+        # 2. Trích xuất data
+        raw_data = getattr(event, 'data', b"")
+        if isinstance(raw_data, bytes):
+            self.data = raw_data.decode('utf-8', errors='ignore')
+        else:
+            self.data = str(raw_data or "")
+
+        # 3. Trích xuất người gửi (from_user)
+        sender_obj = sender or getattr(event, 'sender', None)
+        fallback_uid = getattr(event, 'sender_id', None)
+        if fallback_uid is None and getattr(event, 'query', None):
+            fallback_uid = getattr(event.query, 'user_id', None)
+        self.from_user = UserAdapter(sender_obj, fallback_id=fallback_uid)
+
+        # 4. Trích xuất tin nhắn (message)
+        if message:
+            self.message = MessageAdapter(message, sender=sender_obj)
+        elif getattr(event, 'message', None):
+            self.message = MessageAdapter(event.message, sender=sender_obj)
+        else:
+            chat_id = getattr(event, 'chat_id', None)
+            msg_id = getattr(event, 'message_id', None)
+            if chat_id is None and getattr(event, 'query', None):
+                msg_id = getattr(event.query, 'msg_id', None)
+
+            if chat_id is not None or msg_id is not None:
+                class SimpleMessageFallback:
+                    def __init__(self, c_id, m_id, u_sender, u_fallback):
+                        self.chat = ChatAdapter(c_id or 0)
+                        self.message_id = m_id or 0
+                        self.text = ""
+                        self.caption = ""
+                        self.content_type = "text"
+                        self.from_user = UserAdapter(u_sender, fallback_id=u_fallback)
+                self.message = SimpleMessageFallback(chat_id, msg_id, sender_obj, fallback_uid)
+            else:
+                self.message = None
+
+        self.chat_instance = str(getattr(event, 'chat_instance', getattr(getattr(event, 'query', None), 'chat_instance', '')))
+
+    def answer(self, text: Optional[str] = None, show_alert: bool = False, cache_time: int = 0, url: Optional[str] = None):
+        """Tiện ích phản hồi callback query trực tiếp trên adapter"""
+        if hasattr(self.raw, 'answer'):
+            coro = self.raw.answer(message=text, alert=show_alert, cache_time=cache_time, url=url)
+            try:
+                loop = asyncio.get_running_loop()
+                return loop.create_task(coro)
+            except RuntimeError:
+                pass
+        return None
 
 class MTProtoTeleBot:
     """Lớp điều khiển chính giả lập pyTelegramBotAPI chạy trên nền giao thức MTProto"""
@@ -164,6 +229,12 @@ class MTProtoTeleBot:
 
     async def _handle_message_update(self, event):
         """Hàm xử lý và lọc sự kiện tin nhắn nội bộ"""
+        if not self.loop:
+            try:
+                self.loop = asyncio.get_running_loop()
+            except RuntimeError:
+                pass
+
         msg = event.message
         if not msg:
             return
@@ -200,7 +271,7 @@ class MTProtoTeleBot:
                     continue
 
             # Gọi handler (hỗ trợ cả hàm đồng bộ và không đồng bộ)
-            if asyncio.iscoroutinefunction(handler["func"]):
+            if inspect.iscoroutinefunction(handler["func"]):
                 await handler["func"](adapted_msg)
             else:
                 loop = asyncio.get_running_loop()
@@ -208,7 +279,27 @@ class MTProtoTeleBot:
 
     async def _handle_callback_update(self, event):
         """Hàm xử lý sự kiện CallbackQuery cho nút bấm Inline"""
-        adapted_cb = CallbackQueryAdapter(event)
+        if not self.loop:
+            try:
+                self.loop = asyncio.get_running_loop()
+            except RuntimeError:
+                pass
+
+        sender = None
+        if hasattr(event, 'get_sender'):
+            try:
+                sender = await event.get_sender()
+            except Exception:
+                sender = None
+
+        message = None
+        if hasattr(event, 'get_message'):
+            try:
+                message = await event.get_message()
+            except Exception:
+                message = None
+
+        adapted_cb = CallbackQueryAdapter(event, sender=sender, message=message)
         for handler in self.callback_handlers:
             if handler["filter_func"] is not None:
                 try:
@@ -217,7 +308,7 @@ class MTProtoTeleBot:
                 except Exception:
                     continue
 
-            if asyncio.iscoroutinefunction(handler["func"]):
+            if inspect.iscoroutinefunction(handler["func"]):
                 await handler["func"](adapted_cb)
             else:
                 loop = asyncio.get_running_loop()
@@ -225,6 +316,7 @@ class MTProtoTeleBot:
 
     def _execute_coro(self, coro):
         """Helper hỗ trợ gọi coroutine cho cả môi trường sync và async"""
+        loop = self.loop or getattr(self.client, 'loop', None)
         try:
             running_loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -232,10 +324,21 @@ class MTProtoTeleBot:
 
         if running_loop and running_loop.is_running():
             return asyncio.ensure_future(coro)
+        elif loop and loop.is_running():
+            future = asyncio.run_coroutine_threadsafe(coro, loop)
+            try:
+                return future.result(timeout=60)
+            except Exception:
+                return future
         else:
-            if self.loop and self.loop.is_running():
-                return asyncio.run_coroutine_threadsafe(coro, self.loop)
-            return asyncio.get_event_loop().run_until_complete(coro)
+            try:
+                return asyncio.get_event_loop().run_until_complete(coro)
+            except RuntimeError:
+                new_loop = asyncio.new_event_loop()
+                try:
+                    return new_loop.run_until_complete(coro)
+                finally:
+                    new_loop.close()
 
     def _parse_reply_markup(self, reply_markup: Any):
         """Chuyển đổi reply_markup custom sang chuẩn Telethon"""
@@ -368,9 +471,27 @@ class MTProtoTeleBot:
         """Tải tệp đính kèm trong tin nhắn về máy với Progress Callback"""
         return self._execute_coro(self.client.download_media(message.raw, file=dest_path, progress_callback=progress_callback))
 
-    def answer_callback_query(self, callback_query_id: str, text: Optional[str] = None, show_alert: bool = False) -> Any:
+    def answer_callback_query(
+        self,
+        callback_query_id: Union[str, int],
+        text: Optional[str] = None,
+        show_alert: bool = False,
+        cache_time: int = 0,
+        url: Optional[str] = None
+    ) -> Any:
         """Phản hồi sự kiện nhấn nút Inline button (Callback Query)"""
-        return self._execute_coro(self.client.answer_callback_query(callback_query_id, message=text, alert=show_alert))
+        from telethon.tl.functions.messages import SetBotCallbackAnswerRequest
+        try:
+            q_id = int(callback_query_id)
+        except (ValueError, TypeError):
+            q_id = 0
+        return self._execute_coro(self.client(SetBotCallbackAnswerRequest(
+            query_id=q_id,
+            message=text,
+            alert=show_alert,
+            cache_time=cache_time,
+            url=url
+        )))
 
     def edit_message_text(
         self,

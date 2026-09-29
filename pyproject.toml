@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "telebot-mtproto"
-version = "1.2.0"
+version = "1.2.1"
 authors = [
-    { name = "Telebot MTProto Developer", email = "developer@tenmiencuaban.com" }
+    { name = "Nguyen Quoc Anh", email = "nguyenquocanh.dev@gmail.com" }
 ]
 description = "A lightweight wrapper that brings pyTelegramBotAPI (Telebot) syntax to the powerful MTProto protocol using Telethon under the hood"
 readme = "README.md"
